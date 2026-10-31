@@ -1,0 +1,30 @@
+# Build output
+**/bin/
+**/obj/
+
+# Node and Angular output
+**/node_modules/
+**/.angular/
+**/dist/
+**/coverage/
+
+# IDE and local tooling
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+
+# Local logs and generated files
+*.user
+*.suo
+*.log
+
+# Private architecture and planning documentation
+/docs/*.md

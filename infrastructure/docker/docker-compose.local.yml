@@ -1,0 +1,55 @@
+name: wareflow-local
+
+services:
+  postgres:
+    image: postgres:18.0-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-wareflow}
+      POSTGRES_USER: ${POSTGRES_USER:-wareflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wareflow-local-only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - wareflow-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - wareflow-local
+
+  redis:
+    image: redis:8.2.1-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - wareflow-local
+
+  mailpit:
+    image: axllent/mailpit:v1.27.8
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8025/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wareflow-local
+
+volumes:
+  wareflow-postgres-data:
+    name: wareflow-postgres-data
+
+networks:
+  wareflow-local:
+    name: wareflow-local
