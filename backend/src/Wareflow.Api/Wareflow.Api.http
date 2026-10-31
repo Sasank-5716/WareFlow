@@ -1,6 +1,68 @@
 @Wareflow.Api_HostAddress = http://localhost:5018
 
-GET {{Wareflow.Api_HostAddress}}/weatherforecast/
+### List companies for the signed-in user
+GET {{Wareflow.Api_HostAddress}}/api/tenants
 Accept: application/json
 
 ###
+
+### Create a company
+POST {{Wareflow.Api_HostAddress}}/api/tenants
+Content-Type: application/json
+
+{
+  "name": "Northwind Warehouse",
+  "slug": "northwind-warehouse"
+}
+
+### Select a company for this request
+POST {{Wareflow.Api_HostAddress}}/api/tenants/00000000-0000-0000-0000-000000000001/select
+X-XSRF-TOKEN: replace-with-csrf-token
+
+### Get active company context
+GET {{Wareflow.Api_HostAddress}}/api/tenants/active
+X-Tenant-Id: 00000000-0000-0000-0000-000000000001
+
+### Update active company profile
+PUT {{Wareflow.Api_HostAddress}}/api/tenants/active/profile
+X-Tenant-Id: 00000000-0000-0000-0000-000000000001
+X-XSRF-TOKEN: replace-with-csrf-token
+Content-Type: application/json
+
+{
+  "name": "Northwind Warehouse",
+  "slug": "northwind-warehouse"
+}
+
+### Invite a user
+POST {{Wareflow.Api_HostAddress}}/api/tenants/active/invitations
+X-Tenant-Id: 00000000-0000-0000-0000-000000000001
+X-XSRF-TOKEN: replace-with-csrf-token
+Content-Type: application/json
+
+{
+  "email": "operator@example.com"
+}
+
+### Accept an invitation
+POST {{Wareflow.Api_HostAddress}}/api/tenants/invitations/accept
+X-XSRF-TOKEN: replace-with-csrf-token
+Content-Type: application/json
+
+{
+  "token": "tenant-id.random-single-use-token"
+}
+
+### Reject an invitation
+POST {{Wareflow.Api_HostAddress}}/api/tenants/invitations/reject
+X-XSRF-TOKEN: replace-with-csrf-token
+Content-Type: application/json
+
+{
+  "token": "tenant-id.random-single-use-token"
+}
+
+### Revoke an invitation
+POST {{Wareflow.Api_HostAddress}}/api/tenants/active/invitations/00000000-0000-0000-0000-000000000001/revoke
+X-Tenant-Id: 00000000-0000-0000-0000-000000000001
+X-XSRF-TOKEN: replace-with-csrf-token

@@ -23,13 +23,25 @@ public sealed class GlobalExceptionHandler(
             return false;
         }
 
-        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        var statusCode = exception switch
+        {
+            UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+            InvalidOperationException => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status500InternalServerError
+        };
+        httpContext.Response.StatusCode = statusCode;
 
         var problem = new ProblemDetails
         {
-            Status = StatusCodes.Status500InternalServerError,
-            Title = "An unexpected error occurred.",
-            Detail = environment.IsDevelopment()
+            Status = statusCode,
+            Title = statusCode switch
+            {
+                StatusCodes.Status403Forbidden => "Forbidden",
+                StatusCodes.Status409Conflict => "Conflict",
+                _ => "An unexpected error occurred."
+            },
+            Detail = statusCode == StatusCodes.Status500InternalServerError &&
+                     environment.IsDevelopment()
                 ? "The request could not be completed."
                 : null,
             Instance = httpContext.Request.Path

@@ -34,4 +34,16 @@ public sealed class Tenant
     public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime UpdatedAtUtc { get; private set; }
+
+    public void UpdateProfile(string name, string slug, DateTime updatedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(slug))
+        {
+            throw new ArgumentException("Tenant name and slug are required.");
+        }
+
+        Name = name.Trim();
+        Slug = slug.Trim().ToLowerInvariant();
+        UpdatedAtUtc = DateTime.SpecifyKind(updatedAtUtc, DateTimeKind.Utc);
+    }
 }

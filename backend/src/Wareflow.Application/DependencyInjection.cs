@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Wareflow.Application.Authentication;
 using Wareflow.Application.Foundation;
 using Wareflow.Application.Tenancy;
 
@@ -10,6 +11,7 @@ public static class DependencyInjection
     {
         services.AddSingleton<IFoundationProbeValidator, FoundationProbeValidator>();
         services.AddScoped<ITenantFoundationStore, TenantFoundationStore>();
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
 
         return services;
     }

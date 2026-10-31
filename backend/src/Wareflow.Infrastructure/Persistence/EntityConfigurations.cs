@@ -29,7 +29,33 @@ internal sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<T
         builder.Property(entity => entity.Id).ValueGeneratedNever();
         builder.Property(entity => entity.TenantId).IsRequired();
         builder.Property(entity => entity.IdentityUserId).HasMaxLength(200).IsRequired();
+        builder.Property(entity => entity.Role).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.HasIndex(entity => new { entity.TenantId, entity.IdentityUserId }).IsUnique();
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(entity => entity.TenantId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Property(entity => entity.CreatedAtUtc).IsRequired();
+        builder.Property(entity => entity.UpdatedAtUtc).IsRequired();
+    }
+}
+
+internal sealed class TenantInvitationConfiguration : IEntityTypeConfiguration<TenantInvitation>
+{
+    public void Configure(EntityTypeBuilder<TenantInvitation> builder)
+    {
+        builder.ToTable("tenant_invitations");
+        builder.HasKey(entity => entity.Id);
+        builder.Property(entity => entity.Id).ValueGeneratedNever();
+        builder.Property(entity => entity.TenantId).IsRequired();
+        builder.Property(entity => entity.Email).HasMaxLength(256).IsRequired();
+        builder.Property(entity => entity.TokenHash).HasMaxLength(128).IsRequired();
+        builder.Property(entity => entity.InvitedByIdentityUserId).HasMaxLength(200).IsRequired();
+        builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(entity => entity.ExpiresAtUtc).IsRequired();
+        builder.HasIndex(entity => new { entity.TenantId, entity.Email, entity.Status });
+        builder.HasIndex(entity => entity.TokenHash).IsUnique();
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(entity => entity.TenantId)

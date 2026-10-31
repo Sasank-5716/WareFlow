@@ -1,14 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Wareflow.Application.Tenancy;
 using Wareflow.Domain.Auditing;
 using Wareflow.Domain.Tenancy;
+using Wareflow.Infrastructure.Identity;
 
 namespace Wareflow.Infrastructure.Persistence;
 
 public sealed class WareflowDbContext(
     DbContextOptions<WareflowDbContext> options,
     ITenantContext tenantContext)
-    : DbContext(options)
+    : IdentityDbContext<WareflowIdentityUser>(options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
@@ -17,6 +19,8 @@ public sealed class WareflowDbContext(
     public DbSet<TenantSettings> TenantSettings => Set<TenantSettings>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
 
     public Guid? CurrentTenantId => tenantContext.TenantId;
 
@@ -32,6 +36,10 @@ public sealed class WareflowDbContext(
                 CurrentTenantId.HasValue &&
                 entity.TenantId == CurrentTenantId.Value);
         modelBuilder.Entity<AuditLog>()
+            .HasQueryFilter(entity =>
+                CurrentTenantId.HasValue &&
+                entity.TenantId == CurrentTenantId.Value);
+        modelBuilder.Entity<TenantInvitation>()
             .HasQueryFilter(entity =>
                 CurrentTenantId.HasValue &&
                 entity.TenantId == CurrentTenantId.Value);

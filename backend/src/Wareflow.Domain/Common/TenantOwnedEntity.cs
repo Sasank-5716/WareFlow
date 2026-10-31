@@ -25,5 +25,5 @@ public abstract class TenantOwnedEntity : ITenantOwned, IHasUtcAuditMetadata
 
     public DateTime CreatedAtUtc { get; private set; }
 
-    public DateTime UpdatedAtUtc { get; private set; }
+    public DateTime UpdatedAtUtc { get; protected set; }
 }
