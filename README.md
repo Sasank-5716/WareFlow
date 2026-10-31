@@ -2,7 +2,7 @@
 
 WAREFLOW is a multi-tenant Inventory and Warehouse Management SaaS platform.
 
-This repository currently contains the approved monorepo foundation only. It does not yet include business entities, authentication, migrations, or feature pages.
+This repository currently contains the approved monorepo foundation and foundational tenant persistence. It does not yet include sign-in, inventory, or business feature pages.
 
 ## Repository layout
 
@@ -36,7 +36,7 @@ npm install
 npm start
 ```
 
-Start local PostgreSQL, Redis, and Mailpit with the commands in [docs/LOCAL-DEVELOPMENT.md](docs/LOCAL-DEVELOPMENT.md). Application database access and migrations are not implemented yet.
+Start local PostgreSQL, Redis, and Mailpit with the commands in [docs/LOCAL-DEVELOPMENT.md](docs/LOCAL-DEVELOPMENT.md). Apply the initial tenant migration explicitly using the documented EF command.
 
 ### Tests
 
