@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +9,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Wareflow.Application;
+using Wareflow.Application.Authorization;
 using Wareflow.Application.Persistence;
 using Wareflow.Application.Tenancy;
 using Wareflow.Domain.Tenancy;
 using Wareflow.Infrastructure;
+using Wareflow.Infrastructure.Authorization;
 using Wareflow.Infrastructure.Persistence;
 
 namespace Wareflow.IntegrationTests;
@@ -133,6 +137,7 @@ public sealed class TenantIsolationTests
 
         await InsertSettingsAsync(connection, TenantA);
         await InsertSettingsAsync(connection, TenantB);
+        await InsertMembershipAsync(connection, TenantA, "user-a", "CompanyAdministrator");
     }
 
     private static async Task DeleteTenantDataAsync(
@@ -187,6 +192,82 @@ public sealed class TenantIsolationTests
             ON CONFLICT ("TenantId") DO NOTHING
             """, connection, transaction);
         insert.Parameters.AddWithValue("id", Guid.NewGuid());
+        insert.Parameters.AddWithValue("tenantId", tenantId);
+        await insert.ExecuteNonQueryAsync();
+        await transaction.CommitAsync();
+    }
+
+    [PostgresFact]
+    public async Task A_role_grants_nothing_in_tenant_b()
+    {
+        var connectionString = GetConnectionStringOrUnavailable();
+        Assert.NotNull(connectionString);
+        await PrepareDatabaseAsync(connectionString);
+
+        var user = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, "user-a")],
+            "integration-test"));
+        var accessor = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext { User = user }
+        };
+
+        await using var tenantAContext = new WareflowDbContext(
+            new DbContextOptionsBuilder<WareflowDbContext>()
+                .UseNpgsql(connectionString)
+                .Options,
+            new FixedTenantContext(TenantA));
+        var checkerA = new TenantPermissionChecker(
+            tenantAContext,
+            new FixedTenantContext(TenantA),
+            accessor,
+            new AuthorizationCatalog());
+
+        Assert.True(await checkerA.HasPermissionAsync(
+            Permissions.SettingsManage,
+            CancellationToken.None));
+
+        await using var tenantBContext = new WareflowDbContext(
+            new DbContextOptionsBuilder<WareflowDbContext>()
+                .UseNpgsql(connectionString)
+                .Options,
+            new FixedTenantContext(TenantB));
+        var checkerB = new TenantPermissionChecker(
+            tenantBContext,
+            new FixedTenantContext(TenantB),
+            accessor,
+            new AuthorizationCatalog());
+
+        Assert.False(await checkerB.HasPermissionAsync(
+            Permissions.SettingsManage,
+            CancellationToken.None));
+    }
+
+    private static async Task InsertMembershipAsync(
+        NpgsqlConnection connection,
+        Guid tenantId,
+        string identityUserId,
+        string role)
+    {
+        await using var transaction = await connection.BeginTransactionAsync();
+        await using (var setTenant = new NpgsqlCommand(
+            "SELECT set_config('app.tenant_id', @tenantId, true)",
+            connection,
+            transaction))
+        {
+            setTenant.Parameters.AddWithValue("tenantId", tenantId.ToString());
+            await setTenant.ExecuteNonQueryAsync();
+        }
+
+        await using var insert = new NpgsqlCommand("""
+            INSERT INTO tenant_memberships
+                ("Id", "IdentityUserId", "Role", "Status", "TenantId", "CreatedAtUtc", "UpdatedAtUtc")
+            VALUES (@id, @userId, @role, 'Active', @tenantId, NOW(), NOW())
+            ON CONFLICT ("TenantId", "IdentityUserId") DO UPDATE SET "Role" = EXCLUDED."Role";
+            """, connection, transaction);
+        insert.Parameters.AddWithValue("id", Guid.NewGuid());
+        insert.Parameters.AddWithValue("userId", identityUserId);
+        insert.Parameters.AddWithValue("role", role);
         insert.Parameters.AddWithValue("tenantId", tenantId);
         await insert.ExecuteNonQueryAsync();
         await transaction.CommitAsync();

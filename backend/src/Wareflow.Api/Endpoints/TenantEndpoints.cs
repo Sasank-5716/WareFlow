@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Wareflow.Api.Authorization;
+using Wareflow.Application.Authorization;
 using Wareflow.Application.Tenancy;
 
 namespace Wareflow.Api.Endpoints;
@@ -61,6 +63,7 @@ public static class TenantEndpoints
             ITenantManagementService service,
             CancellationToken cancellationToken) =>
             Results.Ok(await service.UpdateTenantProfileAsync(request, cancellationToken)))
+            .RequirePermission(Permissions.SettingsManage)
             .WithSummary("Update the active company profile")
             .Produces<ActiveTenantContext>();
 
@@ -72,6 +75,7 @@ public static class TenantEndpoints
             var settings = await service.UpdateTenantSettingsAsync(request, cancellationToken);
             return settings is null ? Results.NotFound() : Results.Ok(settings);
         })
+        .RequirePermission(Permissions.SettingsManage)
         .WithSummary("Update the active company settings")
         .Produces<TenantSettingsSnapshot>()
         .Produces(StatusCodes.Status404NotFound);
@@ -80,6 +84,7 @@ public static class TenantEndpoints
             ITenantManagementService service,
             CancellationToken cancellationToken) =>
             Results.Ok(await service.ListInvitationsAsync(cancellationToken)))
+            .RequirePermission(Permissions.UsersView)
             .WithSummary("List active company invitations")
             .Produces<IReadOnlyList<TenantInvitationSummary>>();
 
@@ -93,6 +98,7 @@ public static class TenantEndpoints
                 ? Results.NotFound()
                 : Results.Created($"/api/tenants/active/invitations/{invitation.Invitation.Id}", invitation);
         })
+        .RequirePermission(Permissions.UsersInvite)
         .WithSummary("Invite a user to the active company")
         .Produces<TenantInvitationCreated>(StatusCodes.Status201Created);
 
@@ -103,7 +109,41 @@ public static class TenantEndpoints
             await service.RevokeInvitationAsync(invitationId, cancellationToken)
                 ? Results.NoContent()
                 : Results.NotFound())
+            .RequirePermission(Permissions.UsersManage)
             .WithSummary("Revoke a company invitation")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/active/members", async (
+            ITenantManagementService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ListMembersAsync(cancellationToken)))
+            .RequirePermission(Permissions.UsersView)
+            .WithSummary("List active company members")
+            .Produces<IReadOnlyList<TenantMemberSummary>>();
+
+        group.MapPut("/active/members/{identityUserId}/role", async (
+            string identityUserId,
+            ChangeTenantMemberRoleRequest request,
+            ITenantManagementService service,
+            CancellationToken cancellationToken) =>
+            await service.ChangeMemberRoleAsync(identityUserId, request, cancellationToken)
+                ? Results.NoContent()
+                : Results.NotFound())
+            .RequirePermission(Permissions.UsersManage)
+            .WithSummary("Assign a tenant-scoped role")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapPost("/active/members/{identityUserId}/disable", async (
+            string identityUserId,
+            ITenantManagementService service,
+            CancellationToken cancellationToken) =>
+            await service.DisableMemberAsync(identityUserId, cancellationToken)
+                ? Results.NoContent()
+                : Results.NotFound())
+            .RequirePermission(Permissions.UsersManage)
+            .WithSummary("Disable a tenant membership")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 

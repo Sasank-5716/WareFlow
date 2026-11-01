@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Wareflow.Application.Authentication;
+using Wareflow.Application.Auditing;
+using Wareflow.Application.Authorization;
 using Wareflow.Application.Tenancy;
 using Wareflow.Domain.Tenancy;
 using Wareflow.Infrastructure.Identity;
@@ -20,7 +22,9 @@ public sealed class TenantManagementService(
     TimeProvider timeProvider,
     ILogger<TenantManagementService> logger,
     IEmailSender emailSender,
-    IOptions<IdentityEmailOptions> emailOptions) : ITenantManagementService, ITenantContextResolver
+    IOptions<IdentityEmailOptions> emailOptions,
+    IPermissionChecker permissionChecker,
+    IAuditLogWriter auditLogWriter) : ITenantManagementService, ITenantContextResolver
 {
     public async Task<TenantSummary> CreateTenantAsync(
         CreateTenantRequest request,
@@ -310,6 +314,134 @@ public sealed class TenantManagementService(
         return invitations.Select(ToInvitationSummary).ToArray();
     }
 
+    public async Task<IReadOnlyList<TenantMemberSummary>> ListMembersAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!await permissionChecker.HasPermissionAsync(
+                Permissions.UsersView,
+                cancellationToken))
+        {
+            return [];
+        }
+
+        var tenantId = tenantContext.RequireTenantId();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await SetDatabaseTenantAsync(tenantId, cancellationToken);
+        var members = await dbContext.TenantMemberships
+            .AsNoTracking()
+            .OrderBy(item => item.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return members
+            .Select(member => new TenantMemberSummary(
+                member.Id,
+                member.IdentityUserId,
+                member.Role.ToString(),
+                member.Status.ToString()))
+            .ToArray();
+    }
+
+    public async Task<bool> ChangeMemberRoleAsync(
+        string identityUserId,
+        ChangeTenantMemberRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await permissionChecker.HasPermissionAsync(
+                Permissions.UsersManage,
+                cancellationToken) ||
+            !await permissionChecker.CanAssignRoleAsync(
+                request.Role,
+                cancellationToken) ||
+            !Enum.TryParse<TenantMembershipRole>(
+                request.Role,
+                ignoreCase: false,
+                out var role))
+        {
+            return false;
+        }
+
+        var tenantId = tenantContext.RequireTenantId();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await SetDatabaseTenantAsync(tenantId, cancellationToken);
+        var member = await dbContext.TenantMemberships
+            .SingleOrDefaultAsync(
+                item => item.IdentityUserId == identityUserId,
+                cancellationToken);
+        if (member is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        if (member.Role == TenantMembershipRole.Owner &&
+            role != TenantMembershipRole.Owner &&
+            await dbContext.TenantMemberships.CountAsync(
+                item => item.Role == TenantMembershipRole.Owner &&
+                        item.Status == TenantMembershipStatus.Active,
+                cancellationToken) <= 1)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        member.ChangeRole(role);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditLogWriter.WriteAsync(
+            "TenantMemberRoleChanged",
+            nameof(TenantMembership),
+            member.Id.ToString(),
+            $$"""{"targetUserId":"{{identityUserId}}","role":"{{role}}"}""",
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DisableMemberAsync(
+        string identityUserId,
+        CancellationToken cancellationToken)
+    {
+        if (!await permissionChecker.HasPermissionAsync(
+                Permissions.UsersManage,
+                cancellationToken))
+        {
+            return false;
+        }
+
+        var tenantId = tenantContext.RequireTenantId();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await SetDatabaseTenantAsync(tenantId, cancellationToken);
+        var member = await dbContext.TenantMemberships
+            .SingleOrDefaultAsync(
+                item => item.IdentityUserId == identityUserId,
+                cancellationToken);
+        if (member is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        if (member.Role == TenantMembershipRole.Owner &&
+            await dbContext.TenantMemberships.CountAsync(
+                item => item.Role == TenantMembershipRole.Owner &&
+                        item.Status == TenantMembershipStatus.Active,
+                cancellationToken) <= 1)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        member.Disable();
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await auditLogWriter.WriteAsync(
+            "TenantMemberDisabled",
+            nameof(TenantMembership),
+            member.Id.ToString(),
+            $$"""{"targetUserId":"{{identityUserId}}"}""",
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
     private async Task<bool> RespondToInvitationAsync(
         string token,
         bool accept,
@@ -358,7 +490,7 @@ public sealed class TenantManagementService(
                     dbContext.TenantMemberships.Add(new TenantMembership(
                         tenantId,
                         userId,
-                        TenantMembershipRole.Member,
+                        TenantMembershipRole.ReadOnlyUser,
                         now));
                 }
                 else

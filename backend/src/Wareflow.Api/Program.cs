@@ -1,5 +1,6 @@
 using Serilog;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authorization;
 using Wareflow.Api.Endpoints;
 using Wareflow.Api.ErrorHandling;
 using Wareflow.Application;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using Wareflow.Api.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,6 +73,7 @@ builder.Services.AddAuthentication(options =>
     });
 });
 builder.Services.AddAuthorization();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -145,6 +148,7 @@ app.MapGet("/api/foundation/status", () => Results.Ok(new
 
 app.MapFoundationEndpoints();
 app.MapTenantEndpoints();
+app.MapAuthorizationEndpoints();
 app.MapAuthenticationEndpoints();
 
 app.MapGet("/api/foundation/tenant-settings", async (

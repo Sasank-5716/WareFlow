@@ -41,7 +41,15 @@ public sealed class TenantMembership : TenantOwnedEntity
 public enum TenantMembershipRole
 {
     Owner = 1,
-    Member = 2
+    CompanyAdministrator = 2,
+    WarehouseManager = 3,
+    InventoryManager = 4,
+    PurchasingManager = 5,
+    SalesManager = 6,
+    WarehouseOperator = 7,
+    ReadOnlyUser = 8,
+    [Obsolete("Use ReadOnlyUser for memberships created by older migrations.")]
+    Member = 9
 }
 
 public enum TenantMembershipStatus

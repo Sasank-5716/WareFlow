@@ -9,6 +9,10 @@ using Wareflow.Application.Tenancy;
 using Wareflow.Infrastructure.Persistence;
 using Wareflow.Infrastructure.Tenancy;
 using Wareflow.Infrastructure.Identity;
+using Wareflow.Infrastructure.Authorization;
+using Wareflow.Infrastructure.Auditing;
+using Wareflow.Application.Authorization;
+using Wareflow.Application.Auditing;
 
 namespace Wareflow.Infrastructure;
 
@@ -77,6 +81,9 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ITenantManagementService, TenantManagementService>();
         services.AddScoped<ITenantContextResolver, TenantManagementService>();
+        services.AddSingleton<IAuthorizationCatalog, AuthorizationCatalog>();
+        services.AddScoped<IPermissionChecker, TenantPermissionChecker>();
+        services.AddScoped<IAuditLogWriter, AuditLogWriter>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);

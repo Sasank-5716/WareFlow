@@ -10,7 +10,7 @@ public sealed class TenantOnboardingTests
         var membership = new TenantMembership(
             Guid.NewGuid(),
             "user-1",
-            TenantMembershipRole.Member,
+            TenantMembershipRole.ReadOnlyUser,
             DateTime.UtcNow);
 
         membership.Disable();

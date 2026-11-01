@@ -43,6 +43,16 @@ public sealed record TenantInvitationSummary(
 public sealed record TenantInvitationCreated(
     TenantInvitationSummary Invitation);
 
+/// <summary>Represents a tenant membership returned to an authorized administrator.</summary>
+public sealed record TenantMemberSummary(
+    Guid MembershipId,
+    string IdentityUserId,
+    string Role,
+    string Status);
+
+/// <summary>Payload for assigning a tenant-scoped role.</summary>
+public sealed record ChangeTenantMemberRoleRequest(string Role);
+
 public interface ITenantManagementService
 {
     Task<TenantSummary> CreateTenantAsync(
@@ -84,6 +94,18 @@ public interface ITenantManagementService
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<TenantInvitationSummary>> ListInvitationsAsync(
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<TenantMemberSummary>> ListMembersAsync(
+        CancellationToken cancellationToken);
+
+    Task<bool> ChangeMemberRoleAsync(
+        string identityUserId,
+        ChangeTenantMemberRoleRequest request,
+        CancellationToken cancellationToken);
+
+    Task<bool> DisableMemberAsync(
+        string identityUserId,
         CancellationToken cancellationToken);
 }
 
