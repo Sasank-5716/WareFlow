@@ -1,0 +1,23 @@
+{
+  "servers": {
+    "angular": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@angular/cli",
+        "mcp"
+      ],
+      "cwd": "${workspaceFolder}/frontend/wareflow-web"
+    },
+    "dotnet": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": [
+        "NuGet.Mcp.Server@1.4.23",
+        "--yes"
+      ],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

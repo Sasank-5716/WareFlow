@@ -14,6 +14,7 @@
 !.vscode/extensions.json
 !.vscode/launch.json
 !.vscode/tasks.json
+!.vscode/mcp.json
 
 # Local environment and secrets
 .env
