@@ -68,8 +68,15 @@ public interface IPermissionChecker
     Task<IReadOnlySet<string>> GetPermissionsAsync(
         CancellationToken cancellationToken);
 
+    Task<string?> GetCurrentRoleAsync(
+        CancellationToken cancellationToken);
+
     Task<bool> CanAssignRoleAsync(
         string targetRole,
+        CancellationToken cancellationToken);
+
+    Task<bool> CanDelegatePermissionsAsync(
+        IEnumerable<string> permissions,
         CancellationToken cancellationToken);
 }
 

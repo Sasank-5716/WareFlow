@@ -170,7 +170,7 @@ public sealed class TenantManagementService(
         CancellationToken cancellationToken)
     {
         var tenant = await GetActiveTenantForWriteAsync(
-            TenantMembershipRole.Owner,
+            Permissions.SettingsManage,
             cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await SetDatabaseTenantAsync(tenant.Id, cancellationToken);
@@ -184,7 +184,7 @@ public sealed class TenantManagementService(
         UpdateTenantSettingsRequest request,
         CancellationToken cancellationToken)
     {
-        await GetActiveTenantForWriteAsync(TenantMembershipRole.Owner, cancellationToken);
+        await GetActiveTenantForWriteAsync(Permissions.SettingsManage, cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await SetDatabaseTenantAsync(tenantContext.RequireTenantId(), cancellationToken);
         var settings = await dbContext.TenantSettings
@@ -213,7 +213,7 @@ public sealed class TenantManagementService(
         InviteTenantUserRequest request,
         CancellationToken cancellationToken)
     {
-        await GetActiveTenantForWriteAsync(TenantMembershipRole.Owner, cancellationToken);
+        await GetActiveTenantForWriteAsync(Permissions.UsersInvite, cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await SetDatabaseTenantAsync(tenantContext.RequireTenantId(), cancellationToken);
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -270,7 +270,7 @@ public sealed class TenantManagementService(
         Guid invitationId,
         CancellationToken cancellationToken)
     {
-        await GetActiveTenantForWriteAsync(TenantMembershipRole.Owner, cancellationToken);
+        await GetActiveTenantForWriteAsync(Permissions.UsersManage, cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await SetDatabaseTenantAsync(tenantContext.RequireTenantId(), cancellationToken);
         var invitation = await dbContext.TenantInvitations
@@ -298,7 +298,7 @@ public sealed class TenantManagementService(
     public async Task<IReadOnlyList<TenantInvitationSummary>> ListInvitationsAsync(
         CancellationToken cancellationToken)
     {
-        await GetActiveTenantForWriteAsync(TenantMembershipRole.Owner, cancellationToken);
+        await GetActiveTenantForWriteAsync(Permissions.UsersView, cancellationToken);
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await SetDatabaseTenantAsync(tenantContext.RequireTenantId(), cancellationToken);
         var invitations = await dbContext.TenantInvitations
@@ -361,7 +361,9 @@ public sealed class TenantManagementService(
         }
 
         var tenantId = tenantContext.RequireTenantId();
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            cancellationToken);
         await SetDatabaseTenantAsync(tenantId, cancellationToken);
         var member = await dbContext.TenantMemberships
             .SingleOrDefaultAsync(
@@ -373,6 +375,20 @@ public sealed class TenantManagementService(
             return false;
         }
 
+        var actor = await dbContext.TenantMemberships
+            .SingleOrDefaultAsync(
+                item => item.IdentityUserId == RequireUserId() &&
+                        item.Status == TenantMembershipStatus.Active,
+                cancellationToken);
+        if (actor is null ||
+            (member.Role == TenantMembershipRole.Owner &&
+             actor.Role != TenantMembershipRole.Owner))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        var previousRole = member.Role;
         if (member.Role == TenantMembershipRole.Owner &&
             role != TenantMembershipRole.Owner &&
             await dbContext.TenantMemberships.CountAsync(
@@ -392,6 +408,12 @@ public sealed class TenantManagementService(
             member.Id.ToString(),
             $$"""{"targetUserId":"{{identityUserId}}","role":"{{role}}"}""",
             cancellationToken);
+        await auditLogWriter.WriteAsync(
+            "TenantMemberPermissionsChanged",
+            nameof(TenantMembership),
+            member.Id.ToString(),
+            $$"""{"targetUserId":"{{identityUserId}}","previousRole":"{{previousRole}}","role":"{{role}}"}""",
+            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
     }
@@ -408,13 +430,28 @@ public sealed class TenantManagementService(
         }
 
         var tenantId = tenantContext.RequireTenantId();
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            cancellationToken);
         await SetDatabaseTenantAsync(tenantId, cancellationToken);
         var member = await dbContext.TenantMemberships
             .SingleOrDefaultAsync(
                 item => item.IdentityUserId == identityUserId,
                 cancellationToken);
         if (member is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return false;
+        }
+
+        var actor = await dbContext.TenantMemberships
+            .SingleOrDefaultAsync(
+                item => item.IdentityUserId == RequireUserId() &&
+                        item.Status == TenantMembershipStatus.Active,
+                cancellationToken);
+        if (actor is null ||
+            (member.Role == TenantMembershipRole.Owner &&
+             actor.Role != TenantMembershipRole.Owner))
         {
             await transaction.RollbackAsync(cancellationToken);
             return false;
@@ -516,11 +553,19 @@ public sealed class TenantManagementService(
     }
 
     private async Task<Tenant> GetActiveTenantForWriteAsync(
-        TenantMembershipRole requiredRole,
+        string requiredPermission,
         CancellationToken cancellationToken)
     {
         var userId = RequireUserId();
         var tenantId = tenantContext.RequireTenantId();
+        if (!await permissionChecker.HasPermissionAsync(
+                requiredPermission,
+                cancellationToken))
+        {
+            throw new UnauthorizedAccessException(
+                "The active tenant membership is not authorized.");
+        }
+
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await SetDatabaseTenantAsync(tenantId, cancellationToken);
         await SetDatabaseUserAsync(userId, cancellationToken);
@@ -531,7 +576,7 @@ public sealed class TenantManagementService(
                         item.IdentityUserId == userId &&
                         item.Status == TenantMembershipStatus.Active,
                 cancellationToken);
-        if (membership is null || membership.Role > requiredRole)
+        if (membership is null)
         {
             await transaction.RollbackAsync(cancellationToken);
             throw new UnauthorizedAccessException("The active tenant membership is not authorized.");

@@ -110,6 +110,40 @@ public sealed class TenantIsolationTests
         await Assert.ThrowsAnyAsync<DbUpdateException>(() => db.SaveChangesAsync());
     }
 
+    [PostgresFact]
+    public async Task Tenant_role_permissions_do_not_cross_tenant_boundaries()
+    {
+        var connectionString = GetConnectionStringOrUnavailable();
+        Assert.NotNull(connectionString);
+        await PrepareDatabaseAsync(connectionString);
+
+        var services = new ServiceCollection();
+        services.AddInfrastructure(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:WareflowDatabase"] = connectionString
+            })
+            .Build());
+        services.AddSingleton<ITenantContext>(new FixedTenantContext(TenantB));
+
+        await using var provider = services.BuildServiceProvider();
+        var httpContextAccessor = provider.GetRequiredService<IHttpContextAccessor>();
+        httpContextAccessor.HttpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, "user-a")],
+                "test"))
+        };
+        await using var scope = provider.CreateAsyncScope();
+
+        var checker = scope.ServiceProvider.GetRequiredService<IPermissionChecker>();
+
+        Assert.False(await checker.HasPermissionAsync(
+            Permissions.ProductsView,
+            CancellationToken.None));
+        Assert.Empty(await checker.GetPermissionsAsync(CancellationToken.None));
+    }
+
     private static string? GetConnectionStringOrUnavailable()
     {
         return Environment.GetEnvironmentVariable("WAREFLOW_TEST_CONNECTION_STRING");

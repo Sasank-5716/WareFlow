@@ -49,3 +49,5 @@ Frontend test commands are provided by the generated Angular workspace and will 
 ## Security
 
 Copy `.env.example` to a local environment file and replace placeholders locally. Never commit secrets.
+
+Authorization roles, permissions, tenant isolation, delegation rules, and feature registration are documented in [docs/AUTHORIZATION.md](docs/AUTHORIZATION.md).

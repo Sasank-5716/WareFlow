@@ -83,6 +83,8 @@ public static class DependencyInjection
         services.AddScoped<ITenantContextResolver, TenantManagementService>();
         services.AddSingleton<IAuthorizationCatalog, AuthorizationCatalog>();
         services.AddScoped<IPermissionChecker, TenantPermissionChecker>();
+        services.AddScoped<IResourcePermissionChecker, ResourcePermissionChecker>();
+        services.AddScoped<IWarehouseAssignmentChecker, DenyWarehouseAssignmentChecker>();
         services.AddScoped<IAuditLogWriter, AuditLogWriter>();
 
         services.AddHealthChecks()

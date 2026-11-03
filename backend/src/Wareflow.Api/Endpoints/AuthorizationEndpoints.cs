@@ -26,10 +26,16 @@ public static class AuthorizationEndpoints
                 return Results.NotFound();
             }
 
+            var role = await checker.GetCurrentRoleAsync(cancellationToken);
+            if (role is null)
+            {
+                return Results.NotFound();
+            }
+
             var permissions = await checker.GetPermissionsAsync(cancellationToken);
             return Results.Ok(new PermissionSnapshot(
                 context.TenantId.Value,
-                "ActiveTenant",
+                role,
                 permissions));
         })
         .RequireAuthorization()

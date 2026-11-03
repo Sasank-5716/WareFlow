@@ -37,14 +37,47 @@ public sealed class TenantPermissionChecker(
         var role = await GetActiveRoleAsync(cancellationToken);
         return role is null
             ? new HashSet<string>(StringComparer.Ordinal)
-            : catalog.Roles.First(candidate => candidate.Name == role).Permissions;
+            : catalog.Roles
+                .FirstOrDefault(candidate => candidate.Name == role)
+                ?.Permissions
+                ?? new HashSet<string>(StringComparer.Ordinal);
     }
+
+    public async Task<string?> GetCurrentRoleAsync(
+        CancellationToken cancellationToken) =>
+        await GetActiveRoleAsync(cancellationToken);
 
     public async Task<bool> CanAssignRoleAsync(
         string targetRole,
         CancellationToken cancellationToken)
     {
-        if (!catalog.IsKnownRole(targetRole))
+        var targetDefinition = catalog.Roles
+            .FirstOrDefault(candidate => candidate.Name == targetRole);
+        if (targetDefinition is null)
+        {
+            return false;
+        }
+
+        var currentRole = await GetActiveRoleAsync(cancellationToken);
+        if (targetRole == nameof(TenantMembershipRole.Owner))
+        {
+            return currentRole == nameof(TenantMembershipRole.Owner);
+        }
+
+        return await CanDelegatePermissionsAsync(
+            targetDefinition.Permissions,
+            cancellationToken);
+    }
+
+    public async Task<bool> CanDelegatePermissionsAsync(
+        IEnumerable<string> permissions,
+        CancellationToken cancellationToken)
+    {
+        var requestedPermissions = permissions
+            .Where(permission => !string.IsNullOrWhiteSpace(permission))
+            .ToHashSet(StringComparer.Ordinal);
+        if (requestedPermissions.Count == 0 ||
+            requestedPermissions.Any(permission => !catalog.IsKnownPermission(permission)))
         {
             return false;
         }
@@ -54,12 +87,9 @@ public sealed class TenantPermissionChecker(
             ? null
             : catalog.Roles.FirstOrDefault(candidate => candidate.Name == currentRole);
 
-        if (definition is null || !definition.CanAssignRoles)
-        {
-            return false;
-        }
-
-        return currentRole == "Owner" || targetRole != "Owner";
+        return definition is not null &&
+               definition.CanAssignRoles &&
+               requestedPermissions.IsSubsetOf(definition.Permissions);
     }
 
     private async Task<string?> GetActiveRoleAsync(

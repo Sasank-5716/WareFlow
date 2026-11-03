@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Wareflow.Api.Authorization;
+using Wareflow.Application.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +90,12 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    AuthorizationDevelopmentSeed.Validate(
+        app.Services.GetRequiredService<IAuthorizationCatalog>());
+}
 
 app.UseExceptionHandler();
 app.UseSerilogRequestLogging();

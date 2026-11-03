@@ -46,4 +46,43 @@ public sealed class PermissionCatalogTests
             catalog.Roles.Where(role => role.CanAssignRoles && role.Name != nameof(TenantMembershipRole.Owner))
                 .Select(role => role.Name));
     }
+
+    [Theory]
+    [InlineData("Owner", "Billing.Manage", true)]
+    [InlineData("CompanyAdministrator", "Products.Create", true)]
+    [InlineData("CompanyAdministrator", "Billing.Manage", false)]
+    [InlineData("WarehouseManager", "Products.Update", true)]
+    [InlineData("WarehouseManager", "Purchasing.Approve", false)]
+    [InlineData("InventoryManager", "Inventory.Transfer", true)]
+    [InlineData("InventoryManager", "Orders.Approve", false)]
+    [InlineData("PurchasingManager", "Purchasing.Approve", true)]
+    [InlineData("PurchasingManager", "Orders.Create", false)]
+    [InlineData("SalesManager", "Orders.Approve", true)]
+    [InlineData("SalesManager", "Purchasing.Create", false)]
+    [InlineData("WarehouseOperator", "Inventory.Adjust", true)]
+    [InlineData("WarehouseOperator", "Orders.Create", false)]
+    [InlineData("ReadOnlyUser", "Reports.View", true)]
+    [InlineData("ReadOnlyUser", "Reports.Export", false)]
+    public void Every_initial_role_has_representative_allow_and_deny_paths(
+        string roleName,
+        string permission,
+        bool expected)
+    {
+        var catalog = new AuthorizationCatalog();
+        var role = catalog.Roles.Single(candidate => candidate.Name == roleName);
+
+        Assert.Equal(expected, role.Permissions.Contains(permission));
+    }
+
+    [Fact]
+    public void Delegation_is_limited_to_the_assigning_roles_permissions()
+    {
+        var catalog = new AuthorizationCatalog();
+        var administrator = catalog.Roles.Single(role => role.Name == "CompanyAdministrator");
+        var warehouseManager = catalog.Roles.Single(role => role.Name == "WarehouseManager");
+
+        Assert.True(warehouseManager.Permissions.IsSubsetOf(administrator.Permissions));
+        Assert.False(catalog.Roles.Single(role => role.Name == "Owner")
+            .Permissions.IsSubsetOf(administrator.Permissions));
+    }
 }
