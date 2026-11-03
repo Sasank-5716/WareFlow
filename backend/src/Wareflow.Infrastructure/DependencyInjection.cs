@@ -13,6 +13,8 @@ using Wareflow.Infrastructure.Authorization;
 using Wareflow.Infrastructure.Auditing;
 using Wareflow.Application.Authorization;
 using Wareflow.Application.Auditing;
+using Wareflow.Application.Modules;
+using Wareflow.Infrastructure.Modules;
 
 namespace Wareflow.Infrastructure;
 
@@ -82,7 +84,10 @@ public static class DependencyInjection
         services.AddScoped<ITenantManagementService, TenantManagementService>();
         services.AddScoped<ITenantContextResolver, TenantManagementService>();
         services.AddSingleton<IAuthorizationCatalog, AuthorizationCatalog>();
+        services.AddSingleton<IModuleCatalog, ModuleCatalog>();
         services.AddScoped<IPermissionChecker, TenantPermissionChecker>();
+        services.AddScoped<IModuleAccessChecker, TenantModuleAccessChecker>();
+        services.AddScoped<IModuleService, TenantModuleService>();
         services.AddScoped<IResourcePermissionChecker, ResourcePermissionChecker>();
         services.AddScoped<IWarehouseAssignmentChecker, DenyWarehouseAssignmentChecker>();
         services.AddScoped<IAuditLogWriter, AuditLogWriter>();

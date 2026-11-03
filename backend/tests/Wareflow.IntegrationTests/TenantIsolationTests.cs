@@ -13,9 +13,11 @@ using Wareflow.Application.Authorization;
 using Wareflow.Application.Persistence;
 using Wareflow.Application.Tenancy;
 using Wareflow.Domain.Tenancy;
+using Wareflow.Domain.Modules;
 using Wareflow.Infrastructure;
 using Wareflow.Infrastructure.Authorization;
 using Wareflow.Infrastructure.Persistence;
+using Wareflow.Infrastructure.Tenancy;
 
 namespace Wareflow.IntegrationTests;
 
@@ -142,6 +144,45 @@ public sealed class TenantIsolationTests
             Permissions.ProductsView,
             CancellationToken.None));
         Assert.Empty(await checker.GetPermissionsAsync(CancellationToken.None));
+    }
+
+    [PostgresFact]
+    public async Task Tenant_module_configuration_does_not_cross_tenant_boundaries()
+    {
+        var connectionString = GetConnectionStringOrUnavailable();
+        Assert.NotNull(connectionString);
+        await PrepareDatabaseAsync(connectionString);
+
+        await using var tenantAContext = new WareflowDbContext(
+            new DbContextOptionsBuilder<WareflowDbContext>()
+                .UseNpgsql(connectionString)
+                .Options,
+            new FixedTenantContext(TenantA));
+        var transactionManager = new TenantTransactionManager(
+            tenantAContext,
+            new FixedTenantContext(TenantA));
+        await using (var transaction = await transactionManager.BeginAsync())
+        {
+            tenantAContext.TenantModuleSettings.Add(new TenantModuleSetting(
+                TenantA,
+                "products",
+                enabled: true,
+                DateTime.UtcNow));
+            await tenantAContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+
+        await using var tenantBContext = new WareflowDbContext(
+            new DbContextOptionsBuilder<WareflowDbContext>()
+                .UseNpgsql(connectionString)
+                .Options,
+            new FixedTenantContext(TenantB));
+        var tenantBTransactionManager = new TenantTransactionManager(
+            tenantBContext,
+            new FixedTenantContext(TenantB));
+        await using var tenantBTransaction = await tenantBTransactionManager.BeginAsync();
+        Assert.Empty(await tenantBContext.TenantModuleSettings.ToListAsync());
+        await tenantBTransaction.CommitAsync();
     }
 
     private static string? GetConnectionStringOrUnavailable()

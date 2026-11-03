@@ -75,6 +75,7 @@ builder.Services.AddAuthentication(options =>
 });
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, ModuleAuthorizationHandler>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -95,6 +96,7 @@ if (app.Environment.IsDevelopment())
 {
     AuthorizationDevelopmentSeed.Validate(
         app.Services.GetRequiredService<IAuthorizationCatalog>());
+    app.Services.GetRequiredService<Wareflow.Application.Modules.IModuleCatalog>().Validate();
 }
 
 app.UseExceptionHandler();
@@ -156,6 +158,7 @@ app.MapGet("/api/foundation/status", () => Results.Ok(new
 app.MapFoundationEndpoints();
 app.MapTenantEndpoints();
 app.MapAuthorizationEndpoints();
+app.MapModuleEndpoints();
 app.MapAuthenticationEndpoints();
 
 app.MapGet("/api/foundation/tenant-settings", async (

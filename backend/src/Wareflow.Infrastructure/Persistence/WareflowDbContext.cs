@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Wareflow.Application.Tenancy;
 using Wareflow.Domain.Auditing;
+using Wareflow.Domain.Modules;
 using Wareflow.Domain.Tenancy;
 using Wareflow.Infrastructure.Identity;
 
@@ -22,6 +23,10 @@ public sealed class WareflowDbContext(
 
     public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
 
+    public DbSet<TenantModuleSetting> TenantModuleSettings => Set<TenantModuleSetting>();
+
+    public DbSet<TenantSubscriptionEntitlement> TenantSubscriptionEntitlements => Set<TenantSubscriptionEntitlement>();
+
     public Guid? CurrentTenantId => tenantContext.TenantId;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -40,6 +45,14 @@ public sealed class WareflowDbContext(
                 CurrentTenantId.HasValue &&
                 entity.TenantId == CurrentTenantId.Value);
         modelBuilder.Entity<TenantInvitation>()
+            .HasQueryFilter(entity =>
+                CurrentTenantId.HasValue &&
+                entity.TenantId == CurrentTenantId.Value);
+        modelBuilder.Entity<TenantModuleSetting>()
+            .HasQueryFilter(entity =>
+                CurrentTenantId.HasValue &&
+                entity.TenantId == CurrentTenantId.Value);
+        modelBuilder.Entity<TenantSubscriptionEntitlement>()
             .HasQueryFilter(entity =>
                 CurrentTenantId.HasValue &&
                 entity.TenantId == CurrentTenantId.Value);

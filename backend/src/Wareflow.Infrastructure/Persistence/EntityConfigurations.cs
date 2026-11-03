@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Wareflow.Domain.Auditing;
+using Wareflow.Domain.Modules;
 using Wareflow.Domain.Tenancy;
 
 namespace Wareflow.Infrastructure.Persistence;
@@ -108,5 +109,47 @@ internal sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
             .OnDelete(DeleteBehavior.Cascade);
         builder.Property(entity => entity.CreatedAtUtc).IsRequired();
         builder.Property(entity => entity.UpdatedAtUtc).IsRequired();
+    }
+
+    internal sealed class TenantModuleSettingConfiguration : IEntityTypeConfiguration<TenantModuleSetting>
+    {
+        public void Configure(EntityTypeBuilder<TenantModuleSetting> builder)
+        {
+            builder.ToTable("tenant_module_settings");
+            builder.HasKey(entity => entity.Id);
+            builder.Property(entity => entity.Id).ValueGeneratedNever();
+            builder.Property(entity => entity.TenantId).IsRequired();
+            builder.Property(entity => entity.ModuleKey).HasMaxLength(100).IsRequired();
+            builder.Property(entity => entity.Enabled).IsRequired();
+            builder.HasIndex(entity => new { entity.TenantId, entity.ModuleKey }).IsUnique();
+            builder.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(entity => entity.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+            builder.Property(entity => entity.CreatedAtUtc).IsRequired();
+            builder.Property(entity => entity.UpdatedAtUtc).IsRequired();
+        }
+    }
+
+    internal sealed class TenantSubscriptionEntitlementConfiguration : IEntityTypeConfiguration<TenantSubscriptionEntitlement>
+    {
+        public void Configure(EntityTypeBuilder<TenantSubscriptionEntitlement> builder)
+        {
+            builder.ToTable("tenant_subscription_entitlements");
+            builder.HasKey(entity => entity.Id);
+            builder.Property(entity => entity.Id).ValueGeneratedNever();
+            builder.Property(entity => entity.TenantId).IsRequired();
+            builder.Property(entity => entity.PlanKey).HasMaxLength(100).IsRequired();
+            builder.Property(entity => entity.ModuleKey).HasMaxLength(100).IsRequired();
+            builder.Property(entity => entity.Included).IsRequired();
+            builder.Property(entity => entity.ExpiresAtUtc);
+            builder.HasIndex(entity => new { entity.TenantId, entity.ModuleKey }).IsUnique();
+            builder.HasOne<Tenant>()
+                .WithMany()
+                .HasForeignKey(entity => entity.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+            builder.Property(entity => entity.CreatedAtUtc).IsRequired();
+            builder.Property(entity => entity.UpdatedAtUtc).IsRequired();
+        }
     }
 }
