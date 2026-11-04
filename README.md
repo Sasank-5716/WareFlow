@@ -46,6 +46,17 @@ dotnet test backend\Wareflow.sln
 
 Frontend test commands are provided by the generated Angular workspace and will be extended with feature tests as features are implemented.
 
+### Frontend boundaries
+
+The Angular application is organized by responsibility:
+
+- `src/app/core/` contains singleton infrastructure such as authentication/session seams, tenant context, permissions, feature access, HTTP concerns, guards, theme, notifications, routing progress, and the app shell.
+- `src/app/shared/` contains business-agnostic UI primitives, styles, and utilities. It must not import feature implementations.
+- `src/app/features/` contains lazy business-area route groups and their future pages, models, services, and tests.
+- `src/app/marketing/` contains the public experience and is kept separate from the operational application under `/app`.
+
+The current operational and business routes are intentionally placeholders; real login and inventory workflows are not part of this foundation.
+
 ## Security
 
 Copy `.env.example` to a local environment file and replace placeholders locally. Never commit secrets.
