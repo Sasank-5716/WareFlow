@@ -7,5 +7,11 @@ export const apiUrlInterceptor: HttpInterceptorFn = (request, next) => {
   }
 
   const url = `${runtimeConfig.apiBaseUrl}${request.url}`;
-  return next(request.clone({ url, withCredentials: true }));
+  return next(
+    request.clone({
+      url,
+      withCredentials:
+        new URL(url, window.location.origin).origin !== window.location.origin,
+    }),
+  );
 };

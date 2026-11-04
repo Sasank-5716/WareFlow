@@ -3,10 +3,19 @@ import { RouterLink, RouterOutlet } from '@angular/router';
 import { ThemeMode, ThemeService } from '../services/theme.service';
 import { NotificationService } from '../services/notification.service';
 import { RouteProgressService } from '../services/route-progress.service';
+import { AuthService } from '../auth/auth.service';
+import { TenantSelectorComponent } from '../tenant/tenant-selector.component';
+import { ButtonComponent } from '../../shared/components/button/button.component';
 import { LoadingComponent } from '../../shared/components/loading/loading.component';
 
 @Component({
-  imports: [RouterLink, RouterOutlet, LoadingComponent],
+  imports: [
+    RouterLink,
+    RouterOutlet,
+    LoadingComponent,
+    TenantSelectorComponent,
+    ButtonComponent,
+  ],
   selector: 'app-shell',
   template: `
     <header class="shell-header">
@@ -18,6 +27,14 @@ import { LoadingComponent } from '../../shared/components/loading/loading.compon
         <a routerLink="/app" routerLinkActive="active">Workspace</a>
         <a routerLink="/about" routerLinkActive="active">About</a>
       </nav>
+      @if (auth.isAuthenticated) {
+        <app-tenant-selector />
+        <button appButton variant="ghost" size="sm" type="button" (click)="logout()">
+          Sign out
+        </button>
+      } @else {
+        <a appButton variant="secondary" size="sm" routerLink="/auth/login">Sign in</a>
+      }
       <label class="theme-select">
         <span class="sr-only">Theme</span>
         <select [value]="theme.mode()" (change)="changeTheme($event)">
@@ -48,8 +65,19 @@ export class AppShellComponent {
   readonly theme = inject(ThemeService);
   readonly notifications = inject(NotificationService);
   readonly progress = inject(RouteProgressService);
+  readonly auth = inject(AuthService);
   readonly themeOptions: readonly ThemeMode[] = ['light', 'dark', 'system'];
   changeTheme(event: Event): void {
     this.theme.setMode((event.target as HTMLSelectElement).value as ThemeMode);
+  }
+
+  logout(): void {
+    this.auth.logout().subscribe({
+      error: () =>
+        this.notifications.show({
+          tone: 'error',
+          message: 'Sign out failed. Please try again.',
+        }),
+    });
   }
 }

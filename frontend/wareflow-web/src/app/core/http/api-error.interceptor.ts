@@ -2,12 +2,22 @@ import {
   HttpErrorResponse,
   HttpInterceptorFn,
 } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
 import { ApiError } from '../models/api-error.model';
 
-export const apiErrorInterceptor: HttpInterceptorFn = (request, next) =>
-  next(request).pipe(
+export const apiErrorInterceptor: HttpInterceptorFn = (request, next) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
+      if (error.status === 401 && auth.isAuthenticated) {
+        auth.markSessionExpired();
+        void router.navigate(['/auth/session-expired']);
+      }
       const apiError: ApiError = {
         status: error.status,
         code: readErrorCode(error),
@@ -18,6 +28,7 @@ export const apiErrorInterceptor: HttpInterceptorFn = (request, next) =>
       return throwError(() => apiError);
     }),
   );
+};
 
 function readErrorCode(error: HttpErrorResponse): string {
   const body = asRecord(error.error);
