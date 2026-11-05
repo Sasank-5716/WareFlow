@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { TenantContextService } from './tenant-context.service';
 import { NotificationService } from '../services/notification.service';
+import { NavigationAccessService } from '../navigation/navigation-access.service';
 
 @Component({
   selector: 'app-tenant-selector',
@@ -34,6 +35,7 @@ import { NotificationService } from '../services/notification.service';
 export class TenantSelectorComponent {
   readonly context = inject(TenantContextService);
   private readonly notifications = inject(NotificationService);
+  private readonly navigationAccess = inject(NavigationAccessService);
   readonly switching = signal(false);
 
   switchTenant(event: Event): void {
@@ -44,7 +46,10 @@ export class TenantSelectorComponent {
 
     this.switching.set(true);
     this.context.selectTenant(tenantId).subscribe({
-      next: () => this.switching.set(false),
+      next: () => {
+        this.switching.set(false);
+        this.navigationAccess.load();
+      },
       error: () => {
         this.switching.set(false);
         this.notifications.show({

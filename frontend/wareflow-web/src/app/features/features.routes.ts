@@ -31,6 +31,17 @@ export const FEATURE_ROUTES: Routes = [
     },
   },
   {
+    path: 'reports',
+    loadComponent: () =>
+      import('../shared/pages/placeholder-page.component').then(
+        (module) => module.PlaceholderPageComponent,
+      ),
+    data: {
+      title: 'Reports & analytics',
+      description: 'Operational reporting will be implemented in this feature boundary.',
+    },
+  },
+  {
     path: 'settings',
     loadComponent: () =>
       import('../shared/pages/placeholder-page.component').then(
